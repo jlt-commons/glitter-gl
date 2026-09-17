@@ -36,9 +36,9 @@ brew install gtk4      # macOS; on Linux use your distro's gtk4 + glib dev packa
 
 **`glitter-gl` depends on `glitter` through a pinned `:git/url` +
 `:git/sha`, not `:local/root`.** glitter is public, so jolt clones it
-itself during dependency resolution — a fresh clone of this repo builds
-on its own, with nothing sitting next to it on disk. The `:dev` alias
-overrides that pin back to a sibling `../glitter` checkout, for
+itself during dependency resolution, and a fresh clone of this repo
+builds on its own, with nothing sitting next to it on disk. The `:dev`
+alias overrides that pin back to a sibling `../glitter` checkout, for
 co-developing against an unreleased glitter change:
 
 ```
@@ -52,7 +52,7 @@ jolt -M:dev:test      # builds against ../glitter instead of the pin
 ```
 
 `:dev` only helps if `../glitter` actually exists next to this
-checkout — it is not something a first-time contributor needs or has.
+checkout. It is not something a first-time contributor needs or has.
 
 [babashka](https://babashka.org) is optional but makes everything
 friendlier: `bb info` prints a grouped cheat-sheet of every task. Without
