@@ -32,6 +32,21 @@
 
   :init
   (do
+    ;; --- clojure-lsp format / clean-ns -------------------------------------
+    ;; Passed as `-s` to every `clojure-lsp format` and `clean-ns` call below,
+    ;; including the pre-commit hooks. An empty :project-specs tells
+    ;; clojure-lsp there is no deps.edn project to ask for a classpath, so it
+    ;; never shells out to `clojure -A:test -Spath`. Formatting and ns cleanup
+    ;; read only this repo's own files, and the output is byte-identical with
+    ;; and without the classpath: measured 2026-11-20 with a stub `clojure`
+    ;; on PATH, against injected format drift in examples/ and an unsorted
+    ;; :require in src/. Without this a failed lookup (a Maven Central 429,
+    ;; a CLI-default Clojure version not in the CI cache) makes the check
+    ;; exit 1 on a clean tree (glitter-gl#18). :source-paths still comes from
+    ;; .lsp/config.edn, which `-s` merges into. `lsp:diagnostics` keeps the
+    ;; full classpath, since it does need the dependencies.
+    (def lsp-no-classpath "{:project-specs []}")
+
     ;; --- documentation site ------------------------------------------------
     ;; The generator lives in jlt-commons/docs-engine, not here. The site is
     ;; built in CI (.github/workflows/site.yml, which pins an engine tag), so
@@ -173,28 +188,28 @@
                :task (shell "clj-kondo" "--lint" "src" "test" "examples")}
 
   lsp:format {:doc "Reformat all Clojure files (clojure-lsp)"
-              :task (shell "clojure-lsp" "format")}
+              :task (shell "clojure-lsp" "format" "-s" lsp-no-classpath)}
 
   lsp:format-check {:doc "Check formatting — dry run"
-                    :task (shell "clojure-lsp" "format" "--dry")}
+                    :task (shell "clojure-lsp" "format" "--dry" "-s" lsp-no-classpath)}
 
   lsp:clean-ns {:doc "Clean + organize ns forms (clojure-lsp)"
-                :task (shell "clojure-lsp" "clean-ns")}
+                :task (shell "clojure-lsp" "clean-ns" "-s" lsp-no-classpath)}
 
   lsp:clean-ns-check {:doc "Check ns forms — dry run"
-                      :task (shell "clojure-lsp" "clean-ns" "--dry")}
+                      :task (shell "clojure-lsp" "clean-ns" "--dry" "-s" lsp-no-classpath)}
 
   lsp:diagnostics {:doc "clojure-lsp diagnostics"
                    :task (shell "clojure-lsp" "diagnostics")}
 
   lsp:check {:doc "All LSP checks (format + clean-ns + diagnostics) — dry run"
-             :task (do (shell "clojure-lsp" "format" "--dry")
-                       (shell "clojure-lsp" "clean-ns" "--dry")
+             :task (do (shell "clojure-lsp" "format" "--dry" "-s" lsp-no-classpath)
+                       (shell "clojure-lsp" "clean-ns" "--dry" "-s" lsp-no-classpath)
                        (shell "clojure-lsp" "diagnostics"))}
 
   lsp:fix {:doc "Auto-fix: format + clean-ns (mutating)"
-           :task (do (shell "clojure-lsp" "format")
-                     (shell "clojure-lsp" "clean-ns"))}
+           :task (do (shell "clojure-lsp" "format" "-s" lsp-no-classpath)
+                     (shell "clojure-lsp" "clean-ns" "-s" lsp-no-classpath))}
 
   verify {:doc "Pre-commit gate: lint (report) + test (must pass)"
           :task (do (shell {:continue true} "clj-kondo" "--lint" "src" "test" "examples")
@@ -218,9 +233,9 @@
                                          "LINT_EXIT=$?\n"
                                          "if [ \"$LINT_EXIT\" = \"3\" ]; then echo 'pre-commit: lint errors found'; exit 1; fi\n"
                                          "echo 'pre-commit 2/3: clojure-lsp format --dry'\n"
-                                         "clojure-lsp format --dry || { echo 'run bb lsp:format'; exit 1; }\n"
+                                         "clojure-lsp format --dry -s '" lsp-no-classpath "' || { echo 'run bb lsp:format'; exit 1; }\n"
                                          "echo 'pre-commit 3/3: clojure-lsp clean-ns --dry'\n"
-                                         "clojure-lsp clean-ns --dry || { echo 'run bb lsp:clean-ns'; exit 1; }\n"
+                                         "clojure-lsp clean-ns --dry -s '" lsp-no-classpath "' || { echo 'run bb lsp:clean-ns'; exit 1; }\n"
                                          "exit 0\n"))
                          (shell "chmod" "+x" hook)
                          (println "OK fast pre-commit hook installed")
@@ -235,9 +250,9 @@
                                               "LINT_EXIT=$?\n"
                                               "if [ \"$LINT_EXIT\" = \"3\" ]; then echo 'pre-commit: lint errors found'; exit 1; fi\n"
                                               "echo 'pre-commit 2/4: clojure-lsp format --dry'\n"
-                                              "clojure-lsp format --dry || { echo 'run bb lsp:format'; exit 1; }\n"
+                                              "clojure-lsp format --dry -s '" lsp-no-classpath "' || { echo 'run bb lsp:format'; exit 1; }\n"
                                               "echo 'pre-commit 3/4: clojure-lsp clean-ns --dry'\n"
-                                              "clojure-lsp clean-ns --dry || { echo 'run bb lsp:clean-ns'; exit 1; }\n"
+                                              "clojure-lsp clean-ns --dry -s '" lsp-no-classpath "' || { echo 'run bb lsp:clean-ns'; exit 1; }\n"
                                               "echo 'pre-commit 4/4: unit tests'\n"
                                               "jolt -M:test\n"
                                               "exit $?\n"))

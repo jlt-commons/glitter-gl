@@ -250,6 +250,18 @@ own `bb hooks:install` run. The FAST hook (`bb.edn`'s own doc string calls
 it "~2s") runs clj-kondo errors-only, `clojure-lsp format --dry`, and
 `clojure-lsp clean-ns --dry`.
 
+Both clojure-lsp steps, like the `bb lsp:format*` and `bb lsp:clean-ns*`
+tasks and CI's Formatting and Namespace forms steps, pass
+`-s '{:project-specs []}'`. That stops clojure-lsp from running
+`clojure -A:test -Spath` to build a classpath, which these two commands
+don't need, because they only read this repo's files. Without it, a failed
+lookup made the check exit 1 on a clean tree, and on CI that happened
+whenever Maven Central was slow or rate-limited
+([#18](https://github.com/jlt-commons/glitter-gl/issues/18)). It also means
+the hook works offline. A hook installed before this change still runs the
+old commands, so re-run `bb hooks:install` to pick it up. `bb lsp:diagnostics`
+still builds the full classpath, since it does analyze the dependencies.
+
 Worth knowing which files those three actually look at, because the two
 tools disagree and it is not obvious. clj-kondo takes explicit directory
 arguments (`src test examples`), so it has always covered the demos.
