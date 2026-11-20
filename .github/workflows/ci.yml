@@ -105,13 +105,20 @@ jobs:
       # Pinned to match what the maintainer runs locally and what the
       # `bb hooks:install` pre-commit hook enforces. Floating these to `latest`
       # would let CI disagree with a clean local commit whenever clj-kondo or
-      # clojure-lsp changes a default. `cli` is needed by clojure-lsp for
-      # classpath discovery.
+      # clojure-lsp changes a default.
+      #
+      # No Clojure CLI (`cli:`) on purpose. This job used to install
+      # `cli: latest` only so clojure-lsp could run `clojure -A:test -Spath`,
+      # and that lookup fetched from Maven Central on every cache miss. A 429,
+      # or a CLI release whose default Clojure version wasn't cached yet, made
+      # the format check exit 1 on a clean tree (glitter-gl#18). bb.edn's
+      # format and clean-ns tasks now pass `lsp-no-classpath`, so they never
+      # ask for a classpath. If a future clojure-lsp step needs one, it fails
+      # here with "Classpath lookup failed" rather than passing by luck.
       - uses: DeLaGuardo/setup-clojure@13.6.1
         with:
           bb: 1.12.196
           clj-kondo: "2026.05.25"
-          cli: latest
 
       - uses: clojure-lsp/setup-clojure-lsp@v1.0.3
         with:
@@ -119,8 +126,8 @@ jobs:
 
       # deps.edn pins glitter as a git coordinate, so every cold run clones it
       # and resolves its Maven deps. ~/.jolt/{gitlibs,mvnlibs} is jolt's own
-      # cache; ~/.gitlibs and ~/.m2 are the Clojure CLI's, used by clojure-lsp
-      # when it discovers the classpath. A miss only costs the fetch.
+      # cache, and the only one this job needs now that no Clojure CLI runs
+      # here (see the setup-clojure step). A miss only costs the fetch.
       #
       # ~/.jolt/aot-cache is deliberately NOT cached: it is keyed to the jolt
       # build that produced it, and this workflow can install a different one
@@ -131,8 +138,6 @@ jobs:
           path: |
             ~/.jolt/gitlibs
             ~/.jolt/mvnlibs
-            ~/.gitlibs
-            ~/.m2/repository
           key: deps-${{ runner.os }}-${{ hashFiles('deps.edn') }}
           restore-keys: deps-${{ runner.os }}-
 
